@@ -1,5 +1,9 @@
 package events
 
+import (
+	"errors"
+)
+
 type EventDispatcher struct {
 	handlers map[string][]EventHandlerInterface
 }
@@ -10,13 +14,22 @@ func NewEventDispatcher() *EventDispatcher {
 	}
 }
 
-func (ed *EventDispatcher) Register(eventName string, handler EventHandlerInterface) {
+func (ed *EventDispatcher) Register(eventName string, handler EventHandlerInterface) error {
+	if _, ok := ed.handlers[eventName]; ok {
+		for _, h := range ed.handlers[eventName] {
+			if h == handler {
+				return errors.New("handler already registered")
+			}
+		}
+	}
+	// register
 	ed.handlers[eventName] = append(ed.handlers[eventName], handler)
+	return nil
 }
 
-func (ed *EventDispatcher) Dispatch(event EventInterface) {
+func (ed *EventDispatcher) Dispatch(event EventInterface, errs chan error) {
 	for _, handler := range ed.handlers[event.GetName()] {
-		handler.Handle(event)
+		go handler.Handle(event, errs)
 	}
 }
 

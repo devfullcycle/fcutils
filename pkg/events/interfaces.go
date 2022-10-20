@@ -12,7 +12,7 @@ type EventDispatcherInterface interface {
 }
 
 type EventHandlerInterface interface {
-	Handle(event EventInterface)
+	Handle(event EventInterface, errs chan error)
 }
 
 type EventInterface interface {
