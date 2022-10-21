@@ -2,6 +2,7 @@ package events
 
 import (
 	"errors"
+	"sync"
 )
 
 type EventDispatcher struct {
@@ -22,14 +23,18 @@ func (ed *EventDispatcher) Register(eventName string, handler EventHandlerInterf
 			}
 		}
 	}
-	// register
 	ed.handlers[eventName] = append(ed.handlers[eventName], handler)
 	return nil
 }
 
-func (ed *EventDispatcher) Dispatch(event EventInterface, errs chan error) {
-	for _, handler := range ed.handlers[event.GetName()] {
-		go handler.Handle(event, errs)
+func (ed *EventDispatcher) Dispatch(event EventInterface) {
+	if _, ok := ed.handlers[event.GetName()]; ok {
+		wg := &sync.WaitGroup{}
+		for _, h := range ed.handlers[event.GetName()] {
+			wg.Add(1)
+			go h.Handle(event, wg)
+		}
+		wg.Wait()
 	}
 }
 

@@ -1,7 +1,7 @@
 package events
 
 import (
-	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -31,8 +31,8 @@ type TestEventHandler struct {
 	ID int
 }
 
-func (h *TestEventHandler) Handle(event EventInterface,  errs chan error) {
-	
+func (h *TestEventHandler) Handle(event EventInterface, wg *sync.WaitGroup) {
+	wg.Done()
 }
 
 type EventDispatecherTestSuite struct {
@@ -55,7 +55,7 @@ func (suite *EventDispatecherTestSuite) SetupTest() {
 }
 
 func (suite *EventDispatecherTestSuite) TestEventDispatcher_Register() {
-	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler)	
+	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler)
 	suite.Equal(1, len(suite.eventDispatcher.handlers[suite.event.GetName()]))
 
 	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler2)
@@ -63,7 +63,6 @@ func (suite *EventDispatecherTestSuite) TestEventDispatcher_Register() {
 
 	suite.eventDispatcher.Register(suite.event2.GetName(), &suite.handler3)
 	suite.Equal(1, len(suite.eventDispatcher.handlers[suite.event2.GetName()]))
-
 
 	assert.Equal(suite.T(), &suite.handler, suite.eventDispatcher.handlers[suite.event.GetName()][0])
 	assert.Equal(suite.T(), &suite.handler2, suite.eventDispatcher.handlers[suite.event.GetName()][1])
@@ -76,7 +75,7 @@ func (suite *EventDispatecherTestSuite) TestEventDispatcher_Clear() {
 	suite.eventDispatcher.Register(suite.event2.GetName(), &suite.handler3)
 
 	suite.eventDispatcher.Clear()
-	
+
 	assert.Equal(suite.T(), 0, len(suite.eventDispatcher.handlers))
 }
 
@@ -84,7 +83,7 @@ func (suite *EventDispatecherTestSuite) TestEventDispatcher_Remove() {
 	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler)
 	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler2)
 	suite.eventDispatcher.Register(suite.event2.GetName(), &suite.handler3)
-	
+
 	suite.eventDispatcher.Remove(suite.event.GetName(), &suite.handler)
 	assert.Equal(suite.T(), 1, len(suite.eventDispatcher.handlers[suite.event.GetName()]))
 
@@ -110,51 +109,26 @@ type MockHandler struct {
 	mock.Mock
 }
 
-func (m *MockHandler) Handle(event EventInterface, errs chan error) {
-	m.Called(event, errs)
+func (m *MockHandler) Handle(event EventInterface, wg *sync.WaitGroup) {
+	m.Called(event)
+	wg.Done()
 }
 
 func (suite *EventDispatecherTestSuite) TestEventDispatcher_Dispatch() {
-	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler)
-	suite.eventDispatcher.Register(suite.event.GetName(), &suite.handler2)
-	suite.eventDispatcher.Register(suite.event2.GetName(), &suite.handler3)
+	mockHandler := new(MockHandler)
+	mockHandler.On("Handle", &suite.event)
 
-	errsChan := make(chan error)
-	
-	suite.eventDispatcher.Dispatch(&suite.event, errsChan)
+	mockHandler2 := new(MockHandler)
+	mockHandler2.On("Handle", &suite.event)
 
-	assert.Equal(suite.T(), 0, len(errsChan))
-}
+	suite.eventDispatcher.Register(suite.event.GetName(), mockHandler)
+	suite.eventDispatcher.Register(suite.event.GetName(), mockHandler2)
+	suite.eventDispatcher.Dispatch(&suite.event)
 
-type HandlerWithError struct {
-	ID int
-}
-
-func (h *HandlerWithError) Handle(event EventInterface, errs chan error) {
-	errs <- errors.New("error")
-}
-
-
-func (suite *EventDispatecherTestSuite) TestEventDispatcher_DispatchWithError() {
-	handler1 := HandlerWithError{ID: 1}
-	handler2 := HandlerWithError{ID: 2}
-	handler3 := HandlerWithError{ID: 3}
-	
-
-	suite.eventDispatcher.Register(suite.event.GetName(), &handler1)
-	suite.eventDispatcher.Register(suite.event.GetName(), &handler2)
-	suite.eventDispatcher.Register(suite.event.GetName(), &handler3)
-
-	errsChan := make(chan error)
-	
-	suite.eventDispatcher.Dispatch(&suite.event, errsChan)
-
-	time.Sleep(3 * time.Second)
-	assert.Equal(suite.T(), 3, len(errsChan))
-
-	// for err := range errsChan {
-	// 	assert.Equal(suite.T(), "error", err.Error())
-	// }
+	mockHandler.AssertExpectations(suite.T())
+	mockHandler2.AssertExpectations(suite.T())
+	mockHandler.AssertNumberOfCalls(suite.T(), "Handle", 1)
+	mockHandler2.AssertNumberOfCalls(suite.T(), "Handle", 1)
 }
 
 func TestSuite(t *testing.T) {
