@@ -20,4 +20,5 @@ type EventInterface interface {
 	GetDateTime() time.Time
 	GetPayload() interface{}
 	GetName() string
+	SetPayload(interface{})
 }

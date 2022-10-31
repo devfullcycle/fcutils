@@ -27,6 +27,10 @@ func (e *TestEvent) GetName() string {
 	return e.Name
 }
 
+func (e *TestEvent) SetPayload(payload interface{}) {
+	e.Payload = payload
+}
+
 type TestEventHandler struct {
 	ID int
 }
