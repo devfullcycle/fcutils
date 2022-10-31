@@ -6,7 +6,7 @@ import (
 )
 
 type EventDispatcherInterface interface {
-	Register(eventName string, handler EventHandlerInterface)
+	Register(eventName string, handler EventHandlerInterface) error
 	Dispatch(EventInterface)
 	Remove(eventName string, handler EventHandlerInterface)
 	Has(eventName string, handler EventHandlerInterface) bool
